@@ -1,3 +1,9 @@
+* rev. 10 - 2025 03 01
+
+- Added undo and redo functionality for brush strokes.
+- Configurable number of undo steps (default 20).
+
+
 * rev. 9 - 2025 02 27
 
 - Improved color selector.

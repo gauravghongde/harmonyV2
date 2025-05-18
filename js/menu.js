@@ -14,6 +14,8 @@ Menu.prototype =
 	save: null,
 	clear: null,
 	about: null,
+	undo: null,
+	redo: null,
 	
 	init: function()
 	{
@@ -76,13 +78,32 @@ Menu.prototype =
 		this.clear.innerHTML = 'Clear';
 		this.container.appendChild(this.clear);
 
+		space = document.createTextNode(" ");
+		this.container.appendChild(space);
+		
 		separator = document.createTextNode(" | ");
 		this.container.appendChild(separator);
+
+		space = document.createTextNode(" ");
+		this.container.appendChild(space);
+		
+		this.undo = document.createElement("span");
+		this.undo.className = 'button';
+		this.undo.innerHTML = 'Undo';
+		this.container.appendChild(this.undo);
+		
+		space = document.createTextNode(" ");
+		this.container.appendChild(space);
+		
+		this.redo = document.createElement("span");
+		this.redo.className = 'button';
+		this.redo.innerHTML = 'Redo';
+		this.container.appendChild(this.redo);
 
 		this.about = document.createElement("About");
 		this.about.className = 'button';
 		this.about.innerHTML = 'About';
-		this.container.appendChild(this.about);
+		// this.container.appendChild(this.about);
 	},
 	
 	setForegroundColor: function( color )

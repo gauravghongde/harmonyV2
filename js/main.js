@@ -1,4 +1,4 @@
-const REV = 9;
+const REV = 10;
 const BRUSHES = ["sketchy", "shaded", "chrome", "fur", "longfur", "web", "", "simple", "squares", "ribbon", "", "circles", "grid"];
 const USER_AGENT = navigator.userAgent.toLowerCase();
 
@@ -10,6 +10,10 @@ var SCREEN_WIDTH = window.innerWidth,
     COLOR = [0, 0, 0],
     BACKGROUND_COLOR = [250, 250, 250],
     STORAGE = window.localStorage,
+    MAX_UNDO_STEPS = 20,  // Maximum number of undo steps
+    undoHistory = [],     // Array to store canvas states for undo
+    redoHistory = [],     // Array to store canvas states for redo
+    isStrokeInProgress = false, // Flag to track if a stroke is being drawn
     brush,
     saveTimeOut,
     wacom,
@@ -99,6 +103,10 @@ function init()
 	menu.clear.addEventListener('touchend', onMenuClear, false);
 	menu.about.addEventListener('click', onMenuAbout, false);
 	menu.about.addEventListener('touchend', onMenuAbout, false);
+	menu.undo.addEventListener('click', onMenuUndo, false);
+	menu.undo.addEventListener('touchend', onMenuUndo, false);
+	menu.redo.addEventListener('click', onMenuRedo, false);
+	menu.redo.addEventListener('touchend', onMenuRedo, false);
 	menu.container.addEventListener('mouseover', onMenuMouseOver, { passive: false });
 	menu.container.addEventListener('mouseout', onMenuMouseOut, { passive: false });
 	container.appendChild(menu.container);
@@ -395,6 +403,9 @@ function onMenuClear()
 	if (!confirm("Are you sure?"))
 		return;
 
+	// Save the current state before clearing
+	saveCanvasState();
+
 	context.clearRect(0, 0, SCREEN_WIDTH * PIXEL_RATIO, SCREEN_HEIGHT * PIXEL_RATIO);
 
 	saveToLocalStorage();
@@ -409,6 +420,16 @@ function onMenuAbout()
 
 	isAboutVisible = true;
 	about.show();
+}
+
+function onMenuUndo() {
+    undo();
+    saveToLocalStorage();
+}
+
+function onMenuRedo() {
+    redo();
+    saveToLocalStorage();
 }
 
 
@@ -433,6 +454,12 @@ function onCanvasMouseDown( event )
 		return;
 	}
 
+	// Save canvas state before starting a new brush stroke
+	if (!isStrokeInProgress) {
+		saveCanvasState();
+		isStrokeInProgress = true;
+	}
+
 	BRUSH_PRESSURE = wacom && wacom.isWacom ? wacom.pressure : 1;
 
 	brush.strokeStart( event.clientX, event.clientY );
@@ -451,6 +478,9 @@ function onCanvasMouseMove( event )
 function onCanvasMouseUp()
 {
 	brush.strokeEnd();
+	
+	// Stroke is complete
+	isStrokeInProgress = false;
 
 	window.removeEventListener('mousemove', onCanvasMouseMove, { passive: false });
 	window.removeEventListener('mouseup', onCanvasMouseUp, { passive: false });
@@ -472,6 +502,12 @@ function onCanvasTouchStart( event )
 	if(event.touches.length == 1)
 	{
 		event.preventDefault();
+
+		// Save canvas state before starting a new brush stroke
+		if (!isStrokeInProgress) {
+			saveCanvasState();
+			isStrokeInProgress = true;
+		}
 
 		brush.strokeStart( event.touches[0].pageX, event.touches[0].pageY );
 
@@ -496,6 +532,9 @@ function onCanvasTouchEnd( event )
 		event.preventDefault();
 
 		brush.strokeEnd();
+		
+		// Stroke is complete
+		isStrokeInProgress = false;
 
 		window.removeEventListener('touchmove', onCanvasTouchMove, { passive: false });
 		window.removeEventListener('touchend', onCanvasTouchEnd, { passive: false });
@@ -537,4 +576,58 @@ function cleanPopUps()
 		about.hide();
 		isAboutVisible = false;
 	}
+}
+
+function saveCanvasState() {
+    // Save current canvas state to the undo history
+    if (undoHistory.length >= MAX_UNDO_STEPS) {
+        // Remove the oldest state if we've reached the maximum
+        undoHistory.shift();
+    }
+    
+    let canvasState = canvas.toDataURL('image/png');
+    undoHistory.push(canvasState);
+    
+    // Clear redo history when a new action is performed
+    redoHistory = [];
+}
+
+function undo() {
+    if (undoHistory.length <= 0) return;
+    
+    // Save current state to redo history before undoing
+    let currentState = canvas.toDataURL('image/png');
+    redoHistory.push(currentState);
+    
+    // Get the last state from undo history
+    let lastState = undoHistory.pop();
+    
+    // Load the state onto the canvas
+    loadCanvasState(lastState);
+}
+
+function redo() {
+    if (redoHistory.length <= 0) return;
+    
+    // Save current state to undo history before redoing
+    let currentState = canvas.toDataURL('image/png');
+    undoHistory.push(currentState);
+    
+    // Get the last state from redo history
+    let nextState = redoHistory.pop();
+    
+    // Load the state onto the canvas
+    loadCanvasState(nextState);
+}
+
+function loadCanvasState(dataURL) {
+    let img = new Image();
+    img.onload = function() {
+        context.save();
+        context.scale(1/PIXEL_RATIO, 1/PIXEL_RATIO);
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(img, 0, 0);
+        context.restore();
+    };
+    img.src = dataURL;
 }
